@@ -1,0 +1,10 @@
+# Photo Gallery Backend Dependencies
+
+# Web framework for Python
+Flask==2.3.3
+
+# Cross-Origin Resource Sharing support
+Flask-CORS==4.0.0
+
+# Python Imaging Library for image processing
+Pillow==10.0.1

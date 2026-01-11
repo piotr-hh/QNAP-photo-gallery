@@ -1,0 +1,13 @@
+# Photo Gallery Backend Dependencies - Legacy Python Support
+
+# For Python 3.7+
+# Use this file if your NAS has Python < 3.8
+
+# Web framework for Python
+Flask==2.2.5
+
+# Cross-Origin Resource Sharing support
+Flask-CORS==3.0.10
+
+# Python Imaging Library for image processing
+Pillow==9.5.0

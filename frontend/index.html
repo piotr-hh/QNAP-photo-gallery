@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Gallery Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Main application container -->
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Sidebar header -->
+            <div class="sidebar-header">
+                <h2><i class="fas fa-images"></i> Gallery</h2>
+            </div>
+            
+            <!-- Sidebar content -->
+            <div class="sidebar-content">
+                <!-- Folders section -->
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-folder"></i> Albums</h3>
+                    <div class="folder-list" id="folderList">
+                        <div class="folder-item active" data-folder="">
+                            <i class="fas fa-home"></i> All Photos
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Statistics section -->
+                <div class="sidebar-section">
+                    <h3><i class="fas fa-chart-bar"></i> Statistics</h3>
+                    <div class="stats-info" id="statsInfo">
+                        <div class="stat-item">
+                            <span class="stat-label">Photos:</span>
+                            <span class="stat-value" id="totalPhotos">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Albums:</span>
+                            <span class="stat-value" id="totalFolders">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <!-- Left side of header -->
+                <div class="header-left">
+                    <h1 id="currentAlbum">All Photos</h1>
+                </div>
+                
+                <!-- Right side of header -->
+                <div class="header-right">
+                    <!-- Dark mode toggle -->
+                    <button class="theme-toggle" id="themeToggle" title="Toggle Theme">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div class="content-area">
+                <!-- Loading Spinner -->
+                <div class="loading-spinner" id="loadingSpinner">
+                    <div class="spinner"></div>
+                    <p>Loading photos...</p>
+                </div>
+
+                <!-- Gallery -->
+                <div class="gallery-container">
+                    <div class="gallery" id="gallery"></div>
+                    
+                    <!-- Pagination -->
+                    <div class="pagination" id="pagination"></div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="empty-state" id="emptyState" style="display: none;">
+                    <i class="fas fa-images"></i>
+                    <h3>No photos found</h3>
+                    <p>Try changing search criteria or select a different album</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for photo viewing -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <!-- Close button -->
+            <button class="modal-close" id="modalClose">
+                <i class="fas fa-times"></i>
+            </button>
+            
+            <div class="modal-body">
+                <div class="modal-image-container">
+                    <!-- Main image -->
+                    <img class="modal-image" id="modalImg" alt="">
+                    
+                    <!-- Navigation arrows -->
+                    <button class="modal-nav modal-prev" id="modalPrev">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button class="modal-nav modal-next" id="modalNext">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    
+                    <!-- Photo title under image -->
+                    <div class="modal-title-bottom">
+                        <h3 id="modalTitle">Photo Name</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple configuration
+        // IMPORTANT: Change this IP to your NAS IP address
+        const API_BASE_URL = 'http://192.168.1.100:5050/api';
+        
+        // Application state
+        let currentPhotos = [];  // Currently loaded photos
+        let currentPage = 1;     // Current page number
+        let totalPages = 0;      // Total number of pages
+        let currentPhotoIndex = -1;  // Index of photo in modal
+        let currentFolder = '';  // Currently selected folder
+        let allFolders = [];     // List of all folders
+        
+        // Helper functions
+        function showLoading(show) {
+            // Show or hide loading spinner
+            const spinner = document.getElementById('loadingSpinner');
+            spinner.style.display = show ? 'block' : 'none';
+        }
+        
+        function showError(message) {
+            // Display error message in gallery
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; background: #f8d7da; color: #721c24; border-radius: 8px;">
+                    <h3>Error</h3>
+                    <p>${message}</p>
+                </div>
+            `;
+        }
+        
+        // Load folders
+        async function loadFolders() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/folders`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    allFolders = data.folders;
+                    renderFolders();
+                    document.getElementById('totalFolders').textContent = data.count;
+                }
+            } catch (error) {
+                console.error('Error loading folders:', error);
+            }
+        }
+        
+        // Render folders
+        function renderFolders() {
+            const folderList = document.getElementById('folderList');
+            folderList.innerHTML = `
+                <div class="folder-item ${currentFolder === '' ? 'active' : ''}" onclick="selectFolder('')">
+                    <i class="fas fa-home"></i> All Photos
+                </div>
+            `;
+            
+            allFolders.forEach(folder => {
+                const folderDiv = document.createElement('div');
+                folderDiv.className = `folder-item ${currentFolder === folder ? 'active' : ''}`;
+                folderDiv.onclick = () => selectFolder(folder);
+                folderDiv.innerHTML = `
+                    <i class="fas fa-folder"></i> ${folder.split('/').pop()}
+                `;
+                folderList.appendChild(folderDiv);
+            });
+        }
+        
+        // Select folder
+        function selectFolder(folder) {
+            currentFolder = folder;
+            currentPage = 1;
+            
+            // Update UI
+            renderFolders();
+            document.getElementById('currentAlbum').textContent = 
+                folder ? folder.split('/').pop() : 'All Photos';
+            
+            loadPhotos();
+            // Scroll to top after folder change
+            document.querySelector('.gallery-container').scrollTop = 0;
+        }
+        
+        // Load photos
+        async function loadPhotos(page = 1) {
+            console.log('Loading photos, page:', page, 'folder:', currentFolder);
+            showLoading(true);
+            
+            try {
+                let url = `${API_BASE_URL}/photos?page=${page}&per_page=50`;
+                if (currentFolder) {
+                    url += `&folder=${encodeURIComponent(currentFolder)}`;
+                }
+                
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('API response:', data);
+                
+                if (data.success && data.photos) {
+                    currentPhotos = data.photos;
+                    currentPage = data.current_page || page;
+                    totalPages = data.pages || 0;
+                    
+                    renderPhotos();
+                    renderPagination();
+                    updateStats(data.total || 0);
+                    
+                    console.log('Photos loaded:', currentPhotos.length);
+                } else {
+                    throw new Error(data.error || 'Invalid API response');
+                }
+                
+            } catch (error) {
+                console.error('Error loading photos:', error);
+                showError(`Cannot load photos: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Render photos
+        function renderPhotos() {
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = '';
+            
+            currentPhotos.forEach((photo, index) => {
+                const photoDiv = document.createElement('div');
+                photoDiv.className = 'photo-item';
+                photoDiv.onclick = () => openModal(index);
+                
+                const thumbnailUrl = `${API_BASE_URL}/thumbnail/${photo.path}`;
+                
+                photoDiv.innerHTML = `
+                    <div class="photo-thumbnail">
+                        <div class="photo-loading">Loading...</div>
+                        <img src="${thumbnailUrl}" alt="${photo.filename}" loading="lazy" 
+                             onload="this.previousElementSibling.style.display='none'"
+                             onerror="this.previousElementSibling.textContent='Loading error'">
+                    </div>
+                    <div class="photo-info">
+                        <h3 title="${photo.filename}">${photo.filename}</h3>
+                    </div>
+                `;
+                
+                gallery.appendChild(photoDiv);
+            });
+        }
+        
+        // Render pagination
+        function renderPagination() {
+            const pagination = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+            
+            let html = '';
+            
+            // Previous page
+            html += `<button ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">
+                <i class="fas fa-chevron-left"></i>
+            </button>`;
+            
+            // Page numbers
+            for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+                html += `<button class="${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
+            }
+            
+            // Next page
+            html += `<button ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">
+                <i class="fas fa-chevron-right"></i>
+            </button>`;
+            
+            pagination.innerHTML = html;
+        }
+        
+        // Change page
+        function changePage(page) {
+            if (page >= 1 && page <= totalPages && page !== currentPage) {
+                loadPhotos(page);
+                // Scroll to top after page change
+                document.querySelector('.gallery-container').scrollTop = 0;
+            }
+        }
+        
+        // Update statistics
+        function updateStats(total) {
+            const totalPhotosElement = document.getElementById('totalPhotos');
+            if (totalPhotosElement) {
+                totalPhotosElement.textContent = total;
+            }
+        }
+        
+        // Modal navigation functions
+        function navigateModal(direction) {
+            if (currentPhotos.length === 0) return;
+            
+            if (direction === 'next') {
+                currentPhotoIndex = (currentPhotoIndex + 1) % currentPhotos.length;
+            } else if (direction === 'prev') {
+                currentPhotoIndex = (currentPhotoIndex - 1 + currentPhotos.length) % currentPhotos.length;
+            }
+            
+            updateModalContent();
+        }
+        
+        function updateModalContent() {
+            if (currentPhotoIndex < 0 || currentPhotoIndex >= currentPhotos.length) return;
+            
+            const photo = currentPhotos[currentPhotoIndex];
+            const modalImg = document.getElementById('modalImg');
+            const modalTitle = document.getElementById('modalTitle');
+            
+            modalImg.src = `${API_BASE_URL}/photo/${photo.path}`;
+            modalTitle.textContent = photo.filename;
+            
+            // Update navigation button states
+            updateModalNavigation();
+        }
+        
+        function updateModalNavigation() {
+            const prevBtn = document.getElementById('modalPrev');
+            const nextBtn = document.getElementById('modalNext');
+            
+            // Always enable navigation for cycling through photos
+            prevBtn.style.display = currentPhotos.length > 1 ? 'flex' : 'none';
+            nextBtn.style.display = currentPhotos.length > 1 ? 'flex' : 'none';
+        }
+        
+        // Open modal
+        function openModal(photoIndex) {
+            currentPhotoIndex = photoIndex;
+            const photo = currentPhotos[photoIndex];
+            
+            const modal = document.getElementById('modal');
+            const modalImg = document.getElementById('modalImg');
+            const modalTitle = document.getElementById('modalTitle');
+            
+            modal.classList.add('show');
+            modalImg.src = `${API_BASE_URL}/photo/${photo.path}`;
+            modalTitle.textContent = photo.filename;
+            
+            updateModalNavigation();
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeModal() {
+            const modal = document.getElementById('modal');
+            modal.classList.remove('show');
+            document.body.style.overflow = '';
+        }
+        
+        // Dark mode toggle
+        function toggleTheme() {
+            const body = document.body;
+            const themeToggle = document.getElementById('themeToggle');
+            const icon = themeToggle.querySelector('i');
+            
+            if (body.getAttribute('data-theme') === 'dark') {
+                body.removeAttribute('data-theme');
+                icon.className = 'fas fa-moon';
+                localStorage.setItem('theme', 'light');
+            } else {
+                body.setAttribute('data-theme', 'dark');
+                icon.className = 'fas fa-sun';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+        
+        // Load saved theme
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const themeToggle = document.getElementById('themeToggle');
+            const icon = themeToggle.querySelector('i');
+            
+            if (savedTheme === 'dark') {
+                document.body.setAttribute('data-theme', 'dark');
+                icon.className = 'fas fa-sun';
+            } else {
+                document.body.removeAttribute('data-theme');
+                icon.className = 'fas fa-moon';
+            }
+        }
+        
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Starting photo viewer...');
+            
+            // Load theme
+            loadTheme();
+            
+            // Theme toggle
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+            
+            // Modal close
+            document.getElementById('modalClose').addEventListener('click', closeModal);
+            
+            // Modal navigation
+            document.getElementById('modalPrev').addEventListener('click', () => navigateModal('prev'));
+            document.getElementById('modalNext').addEventListener('click', () => navigateModal('next'));
+            
+            // Modal click outside
+            document.getElementById('modal').addEventListener('click', (e) => {
+                if (e.target.id === 'modal') closeModal();
+            });
+            
+            // Keyboard navigation
+            document.addEventListener('keydown', (e) => {
+                if (document.getElementById('modal').classList.contains('show')) {
+                    if (e.key === 'Escape') closeModal();
+                    else if (e.key === 'ArrowLeft') navigateModal('prev');
+                    else if (e.key === 'ArrowRight') navigateModal('next');
+                }
+            });
+            
+            // Load initial data
+            loadFolders();
+            loadPhotos();
+        });
+    </script>
+</body>
+</html>
