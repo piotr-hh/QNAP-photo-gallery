@@ -237,7 +237,7 @@ body {
 .content-area {
     flex: 1;
     padding: var(--spacing-lg);
-    overflow-y: auto;
+    overflow-y: visible;
 }
 
 /* Loading spinner */
@@ -265,8 +265,7 @@ body {
 
 /* Gallery */
 .gallery-container {
-    max-height: calc(100vh - 200px);
-    overflow-y: auto;
+    width: 100%;
 }
 
 .gallery {

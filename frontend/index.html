@@ -191,6 +191,7 @@
         function selectFolder(folder) {
             currentFolder = folder;
             currentPage = 1;
+            shouldScrollToTop = true;
             
             // Update UI
             renderFolders();
@@ -198,8 +199,6 @@
                 folder ? folder.split('/').pop() : 'All Photos';
             
             loadPhotos();
-            // Scroll to top after folder change
-            document.querySelector('.gallery-container').scrollTop = 0;
         }
         
         // Load photos
@@ -248,6 +247,12 @@
         function renderPhotos() {
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
+
+            // Scroll to top after photos are rendered
+            if (shouldScrollToTop) {
+                window.scrollTo(0, 0);
+                shouldScrollToTop = false;
+            }
             
             currentPhotos.forEach((photo, index) => {
                 const photoDiv = document.createElement('div');
@@ -304,9 +309,8 @@
         // Change page
         function changePage(page) {
             if (page >= 1 && page <= totalPages && page !== currentPage) {
+                shouldScrollToTop = true;
                 loadPhotos(page);
-                // Scroll to top after page change
-                document.querySelector('.gallery-container').scrollTop = 0;
             }
         }
         
